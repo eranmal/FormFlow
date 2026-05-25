@@ -9,11 +9,11 @@ pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/b
 // קביעת כתובת השרת מתוך משתני הסביבה או ברירת מחדל לוקאלית
 const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
-const FormEditor = ({ file, apiKey, onBack }) => {
-  const [step, setStep] = useState(1);
+const FormEditor = ({ file, apiKey, onBack, initialFields = null, initialBoxes = [] }) => {
+  const [step, setStep] = useState(initialFields ? 2 : 1);
   const [language, setLanguage] = useState("English");
 
-  const [fields, setFields] = useState([]);
+  const [fields, setFields] = useState(initialFields || []);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const [rawInput, setRawInput] = useState('');
@@ -28,7 +28,7 @@ const FormEditor = ({ file, apiKey, onBack }) => {
 
   const [numPages, setNumPages] = useState(null);
   const [pageNumber, setPageNumber] = useState(1);
-  const [boxes, setBoxes] = useState([]);
+  const [boxes, setBoxes] = useState(initialBoxes || []);
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentBox, setCurrentBox] = useState(null);
   const [selectedField, setSelectedField] = useState(null);
@@ -206,6 +206,37 @@ const FormEditor = ({ file, apiKey, onBack }) => {
     } catch (error) {
       alert("Error generating PDF: " + error.message);
     }
+  };
+
+  const fileToBase64 = (file) => new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = error => reject(error);
+  });
+
+  const handleSaveTemplate = async () => {
+      try {
+          const base64 = await fileToBase64(file);
+          const template = {
+              id: Date.now(),
+              filename: file.name,
+              pdfBase64: base64,
+              fields: fields,
+              boxes: boxes
+          };
+          const existing = JSON.parse(localStorage.getItem('form_templates') || '[]');
+          
+          const newStorageString = JSON.stringify([...existing.filter(t => t.filename !== file.name), template]);
+          if (newStorageString.length > 4.5 * 1024 * 1024) {
+              alert("Warning: Local storage is nearly full. You may need to delete old templates soon.");
+          }
+          
+          localStorage.setItem('form_templates', newStorageString);
+          alert("Template saved successfully! You can reuse this form from the dashboard.");
+      } catch (e) {
+          alert("Failed to save template. It might be too large for local storage.");
+      }
   };
 
   return (
@@ -459,7 +490,11 @@ const FormEditor = ({ file, apiKey, onBack }) => {
               })}
 
             </div>
-            <button onClick={handleGeneratePdf} className="glass-button mt-6 w-full" style={{ background: 'var(--success-color)' }}>
+            
+            <button onClick={handleSaveTemplate} className="glass-button mt-4 w-full" style={{ background: 'transparent', border: '1px solid var(--accent-color)', color: 'var(--accent-color)' }}>
+              💾 Save as Template
+            </button>
+            <button onClick={handleGeneratePdf} className="glass-button mt-2 w-full" style={{ background: 'var(--success-color)' }}>
               <Download size={18} /> Generate PDF
             </button>
           </div>

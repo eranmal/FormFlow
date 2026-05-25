@@ -1,17 +1,27 @@
-import React, { useState, useRef } from 'react';
-import { LogOut, Upload, FileText, Settings, LayoutDashboard } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { LogOut, Upload, FileText, Settings, LayoutDashboard, FileSpreadsheet, Trash2 } from 'lucide-react';
 import FormEditor from './FormEditor';
 
 const Dashboard = ({ apiKey, onLogout }) => {
   const [activeTab, setActiveTab] = useState('forms');
   const [uploadedFile, setUploadedFile] = useState(null);
+  const [initialFields, setInitialFields] = useState(null);
+  const [initialBoxes, setInitialBoxes] = useState([]);
+  const [templates, setTemplates] = useState([]);
   const fileInputRef = useRef(null);
+
+  useEffect(() => {
+      const stored = JSON.parse(localStorage.getItem('form_templates') || '[]');
+      setTemplates(stored);
+  }, [activeTab]); // Refresh when coming back to dashboard
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
       if (file.type === 'application/pdf' || file.name.endsWith('.docx')) {
         setUploadedFile(file);
+        setInitialFields(null);
+        setInitialBoxes([]);
       } else {
         alert('Please upload a valid PDF or DOCX file.');
       }
@@ -107,12 +117,60 @@ const Dashboard = ({ apiKey, onLogout }) => {
                 />
                 <button className="glass-button mt-8">Select File</button>
               </div>
+
+              {templates.length > 0 && (
+                  <div className="mt-8 animate-fade-in">
+                      <h3 className="mb-4">Saved Templates</h3>
+                      <div className="flex flex-col gap-4">
+                          {templates.map(t => (
+                              <div key={t.id} className="glass-panel flex items-center justify-between" style={{ padding: '16px 24px' }}>
+                                  <div className="flex items-center gap-4">
+                                      <div style={{ background: 'rgba(59, 130, 246, 0.1)', padding: '12px', borderRadius: '12px' }}>
+                                          <FileSpreadsheet color="var(--accent-color)" />
+                                      </div>
+                                      <div>
+                                          <h4 style={{ margin: 0 }}>{t.filename}</h4>
+                                          <p className="text-secondary" style={{ fontSize: '0.85rem', margin: 0 }}>{t.fields.length} fields · {t.boxes.length} mapped boxes</p>
+                                      </div>
+                                  </div>
+                                  <div className="flex gap-2">
+                                      <button 
+                                        onClick={() => {
+                                            const bstr = atob(t.pdfBase64.split(',')[1]);
+                                            let n = bstr.length;
+                                            const u8arr = new Uint8Array(n);
+                                            while(n--){ u8arr[n] = bstr.charCodeAt(n); }
+                                            const file = new File([u8arr], t.filename, { type: 'application/pdf' });
+                                            setInitialFields(t.fields);
+                                            setInitialBoxes(t.boxes);
+                                            setUploadedFile(file);
+                                        }}
+                                        className="glass-button" style={{ padding: '8px 16px', fontSize: '0.9rem' }}
+                                      >
+                                          Use Template
+                                      </button>
+                                      <button 
+                                        onClick={() => {
+                                            const updated = templates.filter(temp => temp.id !== t.id);
+                                            localStorage.setItem('form_templates', JSON.stringify(updated));
+                                            setTemplates(updated);
+                                        }}
+                                        className="glass-button" style={{ padding: '8px 12px', background: 'transparent', border: '1px solid var(--error-color)', color: 'var(--error-color)' }}
+                                      >
+                                          <Trash2 size={16} />
+                                      </button>
+                                  </div>
+                              </div>
+                          ))}
+                      </div>
+                  </div>
+              )}
             </div>
           </>
         )}
 
         {activeTab === 'forms' && uploadedFile && (
-          <FormEditor file={uploadedFile} apiKey={apiKey} onBack={() => setUploadedFile(null)} />
+          <FormEditor file={uploadedFile} apiKey={apiKey} onBack={() => setUploadedFile(null)} initialFields={initialFields} initialBoxes={initialBoxes} />
         )}
 
         {activeTab === 'settings' && (
