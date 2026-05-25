@@ -1,5 +1,7 @@
 # 📝 FormFlow
 
+[![Live Demo](https://img.shields.io/badge/Live_Demo-formflow--app.onrender.com-blue?style=for-the-badge)](https://formflow-app.onrender.com/)
+
 FormFlow is an AI-powered document filling assistant that transforms messy, unstructured thoughts or speech into a perfectly formatted PDF. Speak or type your answers naturally, and FormFlow will analyze the PDF, synthesize your input into a highly professional format, and map it directly onto the document.
 
 Designed with robust multilingual support, FormFlow features flawless Right-to-Left (RTL) formatting for Hebrew documents, ensuring punctuation, line wrapping, and sentence structure are always perfect.
@@ -19,7 +21,13 @@ Designed with robust multilingual support, FormFlow features flawless Right-to-L
 
 ## 🚀 Getting Started
 
-### Prerequisites
+### Live Demo
+You can try the live version of FormFlow instantly without downloading anything:
+🔗 **[https://formflow-app.onrender.com/](https://formflow-app.onrender.com/)**
+
+*(Note: You will still need to provide your own Gemini API Key via the settings menu).*
+
+### Prerequisites (For Local Development)
 
 Ensure you have the following installed on your machine:
 - **Docker** and **Docker Compose**
