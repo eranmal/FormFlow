@@ -18,7 +18,7 @@ FONT_URL = "https://github.com/googlefonts/assistant/raw/master/fonts/ttf/Assist
 FONT_PATH = "Assistant.ttf"
 
 @app.on_event("startup")
-def startup_event():
+async def startup_event():
     if not os.path.exists(FONT_PATH):
         print("Downloading comprehensive Hebrew font (Assistant)...")
         try:
@@ -26,6 +26,14 @@ def startup_event():
             print("Font downloaded.")
         except Exception as e:
             print("Failed to download Hebrew font:", e)
+
+def extract_json_robust(text: str) -> str:
+    text = text.strip()
+    if "```json" in text:
+        text = text.split("```json")[1].split("```")[0]
+    elif "```" in text:
+        text = text.split("```")[1]
+    return text.strip()
 
 app.add_middleware(
     CORSMiddleware,
@@ -85,14 +93,7 @@ async def analyze_form(
             ),
         )
         
-        text = response.text.strip()
-        if text.startswith("```json"):
-            text = text[7:]
-        elif text.startswith("```"):
-            text = text[3:]
-        if text.endswith("```"):
-            text = text[:-3]
-        text = text.strip()
+        text = extract_json_robust(response.text)
             
         fields = json.loads(text)
         return {"fields": fields}
@@ -136,14 +137,7 @@ async def synthesize(
             ),
         )
         
-        text = response.text.strip()
-        if text.startswith("```json"):
-            text = text[7:]
-        elif text.startswith("```"):
-            text = text[3:]
-        if text.endswith("```"):
-            text = text[:-3]
-        text = text.strip()
+        text = extract_json_robust(response.text)
         
         mapped_data = json.loads(text)
         return {"mapped_data": mapped_data}
