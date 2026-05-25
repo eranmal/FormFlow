@@ -6,29 +6,32 @@ import { Mic, MicOff, Send, Download, Loader2, Edit3, Globe, AlertTriangle } fro
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
+// קביעת כתובת השרת מתוך משתני הסביבה או ברירת מחדל לוקאלית
+const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
 const FormEditor = ({ file, apiKey, onBack }) => {
-  const [step, setStep] = useState(1); 
+  const [step, setStep] = useState(1);
   const [language, setLanguage] = useState("English");
-  
+
   const [fields, setFields] = useState([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  
+
   const [rawInput, setRawInput] = useState('');
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef(null);
-  
+
   const [isSynthesizing, setIsSynthesizing] = useState(false);
   const [synthesizedData, setSynthesizedData] = useState({});
-  
-  const [activeField, setActiveField] = useState(null); 
-  const [directInput, setDirectInput] = useState({}); 
+
+  const [activeField, setActiveField] = useState(null);
+  const [directInput, setDirectInput] = useState({});
 
   const [numPages, setNumPages] = useState(null);
   const [pageNumber, setPageNumber] = useState(1);
   const [boxes, setBoxes] = useState([]);
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentBox, setCurrentBox] = useState(null);
-  const [selectedField, setSelectedField] = useState(null); 
+  const [selectedField, setSelectedField] = useState(null);
   const [editingField, setEditingField] = useState(null);
   const [editValue, setEditValue] = useState("");
 
@@ -41,26 +44,26 @@ const FormEditor = ({ file, apiKey, onBack }) => {
       recognitionRef.current = new SpeechRecognition();
       recognitionRef.current.continuous = true;
       recognitionRef.current.interimResults = true;
-      
+
       recognitionRef.current.onresult = (event) => {
         let transcript = '';
         for (let i = 0; i < event.results.length; i++) {
           transcript += event.results[i][0].transcript;
         }
-        
+
         if (activeField) {
-            setDirectInput(prev => ({ ...prev, [activeField.fieldName]: transcript }));
+          setDirectInput(prev => ({ ...prev, [activeField.fieldName]: transcript }));
         } else {
-            setRawInput(transcript);
+          setRawInput(transcript);
         }
       };
     }
   }, [activeField]);
-  
+
   useEffect(() => {
-      if (recognitionRef.current) {
-          recognitionRef.current.lang = language === 'Hebrew' ? 'he-IL' : 'en-US';
-      }
+    if (recognitionRef.current) {
+      recognitionRef.current.lang = language === 'Hebrew' ? 'he-IL' : 'en-US';
+    }
   }, [language]);
 
   const toggleListen = () => {
@@ -79,19 +82,20 @@ const FormEditor = ({ file, apiKey, onBack }) => {
       formData.append('file', file);
       formData.append('language', language);
 
-      const response = await fetch('http://localhost:8000/api/analyze-form', {
+      // שימוש במשתנה הכתובת הדינמי
+      const response = await fetch(`${apiUrl}/api/analyze-form`, {
         method: 'POST',
         headers: { 'x-api-key': apiKey },
         body: formData
       });
-      
+
       if (!response.ok) throw new Error('Analysis failed');
       const data = await response.json();
-      
+
       let parsedFields = data.fields;
       if (typeof parsedFields === 'string') {
-          const match = parsedFields.match(/\[.*\]/s);
-          if (match) parsedFields = JSON.parse(match[0]);
+        const match = parsedFields.match(/\[.*\]/s);
+        if (match) parsedFields = JSON.parse(match[0]);
       }
 
       setFields(parsedFields);
@@ -111,15 +115,16 @@ const FormEditor = ({ file, apiKey, onBack }) => {
       formData.append('fields', JSON.stringify(fields));
       formData.append('direct_inputs', JSON.stringify(directInput));
 
-      const response = await fetch('http://localhost:8000/api/synthesize', {
+      // שימוש במשתנה הכתובת הדינמי
+      const response = await fetch(`${apiUrl}/api/synthesize`, {
         method: 'POST',
         headers: { 'x-api-key': apiKey },
         body: formData
       });
-      
+
       if (!response.ok) throw new Error('Synthesis failed');
       const data = await response.json();
-      
+
       setSynthesizedData(data.mapped_data);
       setStep(3);
     } catch (error) {
@@ -156,7 +161,7 @@ const FormEditor = ({ file, apiKey, onBack }) => {
         x1: Math.max(currentBox.startX, currentBox.endX) / pdfScale,
         y1: Math.max(currentBox.startY, currentBox.endY) / pdfScale,
         field: currentBox.field,
-        page: pageNumber - 1 
+        page: pageNumber - 1
       };
       setBoxes([...boxes, newBox]);
       setSelectedField(null);
@@ -166,31 +171,32 @@ const FormEditor = ({ file, apiKey, onBack }) => {
   };
 
   const handleRemoveBox = (fieldName, e) => {
-      e.stopPropagation();
-      setBoxes(boxes.filter(b => b.field.name !== fieldName));
-      if (selectedField?.name === fieldName) setSelectedField(null);
+    e.stopPropagation();
+    setBoxes(boxes.filter(b => b.field.name !== fieldName));
+    if (selectedField?.name === fieldName) setSelectedField(null);
   };
 
   const handleGeneratePdf = async () => {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      
+
       const textMappings = boxes.map(b => ({
-          text: synthesizedData[b.field.name] || "",
-          page: b.page,
-          rect: { x0: b.x0, y0: b.y0, x1: b.x1, y1: b.y1 }
-        }));
-        
+        text: synthesizedData[b.field.name] || "",
+        page: b.page,
+        rect: { x0: b.x0, y0: b.y0, x1: b.x1, y1: b.y1 }
+      }));
+
       formData.append('mappings', JSON.stringify(textMappings));
 
-      const response = await fetch('http://localhost:8000/api/generate-pdf', {
+      // שימוש במשתנה הכתובת הדינמי
+      const response = await fetch(`${apiUrl}/api/generate-pdf`, {
         method: 'POST',
         body: formData
       });
-      
+
       if (!response.ok) throw new Error('Generation failed');
-      
+
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -213,24 +219,24 @@ const FormEditor = ({ file, apiKey, onBack }) => {
         <div className="glass-panel" style={{ padding: '40px', textAlign: 'center' }}>
           <h3>Step 1: AI Analysis</h3>
           <p className="text-secondary mt-2 mb-6">Select your preferred language and extract fields from this document.</p>
-          
+
           <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid var(--error-color)', padding: '16px', borderRadius: '8px', maxWidth: '600px', margin: '0 auto 24px auto', display: 'flex', alignItems: 'center', gap: '12px', textAlign: 'left' }}>
-              <AlertTriangle color="var(--error-color)" size={24} style={{ flexShrink: 0 }} />
-              <p style={{ fontSize: '0.9rem', color: 'var(--text-color)' }}>
-                  <strong>Note:</strong> Tables, checkbox grids, and matrices must be filled manually outside of this app. The AI will completely ignore them to reduce processing costs and focus strictly on free-text blocks.
-              </p>
+            <AlertTriangle color="var(--error-color)" size={24} style={{ flexShrink: 0 }} />
+            <p style={{ fontSize: '0.9rem', color: 'var(--text-color)' }}>
+              <strong>Note:</strong> Tables, checkbox grids, and matrices must be filled manually outside of this app. The AI will completely ignore them to reduce processing costs and focus strictly on free-text blocks.
+            </p>
           </div>
 
           <div className="flex items-center justify-center gap-4 mb-8">
-            <Globe size={20} className="text-secondary"/>
-            <select 
-                value={language}
-                onChange={(e) => setLanguage(e.target.value)}
-                className="glass-input"
-                style={{ padding: '8px 16px', cursor: 'pointer' }}
+            <Globe size={20} className="text-secondary" />
+            <select
+              value={language}
+              onChange={(e) => setLanguage(e.target.value)}
+              className="glass-input"
+              style={{ padding: '8px 16px', cursor: 'pointer' }}
             >
-                <option value="English">English</option>
-                <option value="Hebrew">עברית (Hebrew)</option>
+              <option value="English">English</option>
+              <option value="Hebrew">עברית (Hebrew)</option>
             </select>
           </div>
 
@@ -243,22 +249,22 @@ const FormEditor = ({ file, apiKey, onBack }) => {
       {step === 2 && (
         <div className="flex gap-6">
           <div className="glass-panel w-full" style={{ padding: '32px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-            
+
             {!activeField ? (
               <>
                 <h3>Step 2: Global Unstructured Input</h3>
                 <p className="text-secondary mb-4" style={{ fontSize: '0.9rem' }}>Record or type your thoughts generally. The AI will map it to all fields automatically.</p>
-                
+
                 <div className="relative mb-6 flex-grow">
-                  <textarea 
+                  <textarea
                     dir="auto"
-                    className="glass-input w-full h-full" 
+                    className="glass-input w-full h-full"
                     style={{ minHeight: '300px', resize: 'vertical' }}
                     placeholder="Start typing or click the mic to speak..."
                     value={rawInput}
                     onChange={(e) => setRawInput(e.target.value)}
                   />
-                  <button 
+                  <button
                     onClick={toggleListen}
                     style={{
                       position: 'absolute', bottom: '16px', right: '16px',
@@ -273,36 +279,36 @@ const FormEditor = ({ file, apiKey, onBack }) => {
                 </div>
               </>
             ) : (
-                <div className="flex-grow flex flex-col">
-                    <div className="flex items-center justify-between mb-6">
-                        <h3 dir="auto">Direct Input: {activeField.fieldName}</h3>
-                        <button onClick={() => setActiveField(null)} className="glass-button" style={{ padding: '8px 16px', fontSize: '0.85rem' }}>Back to Global Input</button>
-                    </div>
-                    <p className="text-secondary mb-4" style={{ fontSize: '0.9rem' }}>Type specifically for this field. The AI will still refine it into high official language.</p>
-                    
-                    <div className="relative mb-6 flex-grow">
-                      <textarea 
-                        dir="auto"
-                        className="glass-input w-full h-full" 
-                        style={{ minHeight: '300px', resize: 'vertical' }}
-                        placeholder={`Start typing your answer for ${activeField.fieldName}...`}
-                        value={directInput[activeField.fieldName] || ''}
-                        onChange={(e) => setDirectInput(prev => ({ ...prev, [activeField.fieldName]: e.target.value }))}
-                      />
-                      <button 
-                        onClick={toggleListen}
-                        style={{
-                          position: 'absolute', bottom: '16px', right: '16px',
-                          background: isListening ? 'var(--error-color)' : 'var(--accent-color)',
-                          color: 'white', border: 'none', padding: '12px', borderRadius: '50%',
-                          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          transition: 'all 0.2s', boxShadow: isListening ? '0 0 15px rgba(239, 68, 68, 0.5)' : 'none'
-                        }}
-                      >
-                        {isListening ? <MicOff size={20} /> : <Mic size={20} />}
-                      </button>
-                    </div>
+              <div className="flex-grow flex flex-col">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 dir="auto">Direct Input: {activeField.fieldName}</h3>
+                  <button onClick={() => setActiveField(null)} className="glass-button" style={{ padding: '8px 16px', fontSize: '0.85rem' }}>Back to Global Input</button>
                 </div>
+                <p className="text-secondary mb-4" style={{ fontSize: '0.9rem' }}>Type specifically for this field. The AI will still refine it into high official language.</p>
+
+                <div className="relative mb-6 flex-grow">
+                  <textarea
+                    dir="auto"
+                    className="glass-input w-full h-full"
+                    style={{ minHeight: '300px', resize: 'vertical' }}
+                    placeholder={`Start typing your answer for ${activeField.fieldName}...`}
+                    value={directInput[activeField.fieldName] || ''}
+                    onChange={(e) => setDirectInput(prev => ({ ...prev, [activeField.fieldName]: e.target.value }))}
+                  />
+                  <button
+                    onClick={toggleListen}
+                    style={{
+                      position: 'absolute', bottom: '16px', right: '16px',
+                      background: isListening ? 'var(--error-color)' : 'var(--accent-color)',
+                      color: 'white', border: 'none', padding: '12px', borderRadius: '50%',
+                      cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      transition: 'all 0.2s', boxShadow: isListening ? '0 0 15px rgba(239, 68, 68, 0.5)' : 'none'
+                    }}
+                  >
+                    {isListening ? <MicOff size={20} /> : <Mic size={20} />}
+                  </button>
+                </div>
+              </div>
             )}
 
             <button onClick={handleSynthesize} disabled={isSynthesizing || (!rawInput.trim() && Object.keys(directInput).length === 0)} className="glass-button w-full mt-4">
@@ -316,10 +322,10 @@ const FormEditor = ({ file, apiKey, onBack }) => {
               {fields.map((f, i) => {
                 const isActive = activeField?.fieldName === f.fieldName;
                 return (
-                  <div 
-                    key={i} 
+                  <div
+                    key={i}
                     onClick={() => setActiveField(f)}
-                    style={{ 
+                    style={{
                       padding: '12px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px',
                       cursor: 'pointer',
                       border: isActive ? '1px solid var(--accent-color)' : '1px solid transparent',
@@ -352,8 +358,8 @@ const FormEditor = ({ file, apiKey, onBack }) => {
           <div className="glass-panel flex flex-col" style={{ flex: 1, padding: '20px', alignItems: 'center' }}>
             <h3 className="mb-4">Step 3: Map to Document</h3>
             <p className="text-secondary mb-4 text-center">Select a field on the right, then draw a box on the PDF where it should go.</p>
-            
-            <div 
+
+            <div
               ref={containerRef}
               style={{ position: 'relative', display: 'inline-block', border: '1px solid var(--glass-border)', cursor: selectedField ? 'crosshair' : 'default' }}
               onMouseDown={handleMouseDown}
@@ -388,7 +394,7 @@ const FormEditor = ({ file, apiKey, onBack }) => {
                 }} />
               )}
             </div>
-            
+
             <div className="flex gap-4 mt-4 items-center">
               <button disabled={pageNumber <= 1} onClick={() => setPageNumber(p => p - 1)} className="glass-button py-2">Prev</button>
               <span>Page {pageNumber} of {numPages}</span>
@@ -399,17 +405,17 @@ const FormEditor = ({ file, apiKey, onBack }) => {
           <div className="glass-panel" style={{ width: '350px', padding: '24px', display: 'flex', flexDirection: 'column' }}>
             <h3 className="mb-4">Synthesized Answers</h3>
             <div className="flex flex-col gap-3 flex-grow" style={{ overflowY: 'auto', maxHeight: '500px' }}>
-              
+
               {Object.entries(synthesizedData).map(([fieldName, text]) => {
                 const isMapped = boxes.some(b => b.field.name === fieldName);
                 const isSelected = selectedField?.name === fieldName;
                 const isEditing = editingField === fieldName;
-                
+
                 return (
-                  <div 
+                  <div
                     key={`text-${fieldName}`}
                     onClick={() => !isMapped && !isEditing && setSelectedField({ type: 'text', name: fieldName })}
-                    style={{ 
+                    style={{
                       padding: '12px', borderRadius: '8px', cursor: (isMapped || isEditing) ? 'default' : 'pointer',
                       background: isMapped ? 'rgba(34, 197, 94, 0.1)' : (isSelected ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255,255,255,0.05)'),
                       border: `1px solid ${isSelected ? 'var(--accent-color)' : (isMapped ? '#22c55e' : 'transparent')}`
@@ -417,36 +423,36 @@ const FormEditor = ({ file, apiKey, onBack }) => {
                     dir="auto"
                   >
                     <div className="flex items-center justify-between mb-2">
-                        <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{fieldName}</div>
-                        <div className="flex gap-2">
-                            {isMapped && (
-                                <button onClick={(e) => handleRemoveBox(fieldName, e)} className="glass-button" style={{ padding: '2px 6px', fontSize: '0.75rem', background: 'rgba(239, 68, 68, 0.2)' }}>Unmap (X)</button>
-                            )}
-                            {!isMapped && !isEditing && (
-                                <button onClick={(e) => { e.stopPropagation(); setEditingField(fieldName); setEditValue(text); }} className="glass-button" style={{ padding: '2px 6px', fontSize: '0.75rem' }}>Edit</button>
-                            )}
-                        </div>
+                      <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{fieldName}</div>
+                      <div className="flex gap-2">
+                        {isMapped && (
+                          <button onClick={(e) => handleRemoveBox(fieldName, e)} className="glass-button" style={{ padding: '2px 6px', fontSize: '0.75rem', background: 'rgba(239, 68, 68, 0.2)' }}>Unmap (X)</button>
+                        )}
+                        {!isMapped && !isEditing && (
+                          <button onClick={(e) => { e.stopPropagation(); setEditingField(fieldName); setEditValue(text); }} className="glass-button" style={{ padding: '2px 6px', fontSize: '0.75rem' }}>Edit</button>
+                        )}
+                      </div>
                     </div>
-                    
+
                     {isEditing ? (
-                        <div className="flex flex-col gap-2" onClick={e => e.stopPropagation()}>
-                            <textarea 
-                                value={editValue}
-                                onChange={e => setEditValue(e.target.value)}
-                                className="glass-input w-full"
-                                style={{ minHeight: '80px', fontSize: '0.85rem' }}
-                                dir="auto"
-                            />
-                            <div className="flex justify-end gap-2">
-                                <button onClick={() => setEditingField(null)} className="glass-button" style={{ padding: '4px 8px', fontSize: '0.75rem' }}>Cancel</button>
-                                <button onClick={() => {
-                                    setSynthesizedData(prev => ({...prev, [fieldName]: editValue}));
-                                    setEditingField(null);
-                                }} className="glass-button" style={{ padding: '4px 8px', fontSize: '0.75rem', background: 'var(--accent-color)' }}>Save</button>
-                            </div>
+                      <div className="flex flex-col gap-2" onClick={e => e.stopPropagation()}>
+                        <textarea
+                          value={editValue}
+                          onChange={e => setEditValue(e.target.value)}
+                          className="glass-input w-full"
+                          style={{ minHeight: '80px', fontSize: '0.85rem' }}
+                          dir="auto"
+                        />
+                        <div className="flex justify-end gap-2">
+                          <button onClick={() => setEditingField(null)} className="glass-button" style={{ padding: '4px 8px', fontSize: '0.75rem' }}>Cancel</button>
+                          <button onClick={() => {
+                            setSynthesizedData(prev => ({ ...prev, [fieldName]: editValue }));
+                            setEditingField(null);
+                          }} className="glass-button" style={{ padding: '4px 8px', fontSize: '0.75rem', background: 'var(--accent-color)' }}>Save</button>
                         </div>
+                      </div>
                     ) : (
-                        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{text}</p>
+                      <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{text}</p>
                     )}
                   </div>
                 );
