@@ -89,7 +89,10 @@ const FormEditor = ({ file, apiKey, onBack, initialFields = null, initialBoxes =
         body: formData
       });
 
-      if (!response.ok) throw new Error('Analysis failed');
+      if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.detail || `Server error: ${response.status}`);
+      }
       const data = await response.json();
 
       let parsedFields = data.fields;
@@ -122,7 +125,10 @@ const FormEditor = ({ file, apiKey, onBack, initialFields = null, initialBoxes =
         body: formData
       });
 
-      if (!response.ok) throw new Error('Synthesis failed');
+      if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.detail || `Server error: ${response.status}`);
+      }
       const data = await response.json();
 
       setSynthesizedData(data.mapped_data);
@@ -195,8 +201,11 @@ const FormEditor = ({ file, apiKey, onBack, initialFields = null, initialBoxes =
         body: formData
       });
 
-      if (!response.ok) throw new Error('Generation failed');
-
+      if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.detail || `Server error: ${response.status}`);
+      }
+      
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
