@@ -136,10 +136,21 @@ async def synthesize(
             ),
         )
         
-        mapped_data = json.loads(response.text)
+        text = response.text.strip()
+        if text.startswith("```json"):
+            text = text[7:]
+        elif text.startswith("```"):
+            text = text[3:]
+        if text.endswith("```"):
+            text = text[:-3]
+        text = text.strip()
+        
+        mapped_data = json.loads(text)
         return {"mapped_data": mapped_data}
         
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/generate-pdf")
